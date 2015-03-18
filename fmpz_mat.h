@@ -203,6 +203,9 @@ FLINT_DLL void fmpz_mat_scalar_mod_fmpz(fmpz_mat_t B, const fmpz_mat_t A, const 
 
 FLINT_DLL void fmpz_mat_mul(fmpz_mat_t C, const fmpz_mat_t A, const fmpz_mat_t B);
 
+FLINT_DLL void fmpz_mat_mul_strassen(fmpz_mat_t C, const fmpz_mat_t A, 
+    const fmpz_mat_t B);
+
 FLINT_DLL void fmpz_mat_mul_classical(fmpz_mat_t C, const fmpz_mat_t A,
     const fmpz_mat_t B);
 

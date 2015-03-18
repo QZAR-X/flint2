@@ -463,6 +463,9 @@ FLINT_DEFINE_THREEARY_EXPR_COND3(mat_at_op, fmpzxx,
 FLINT_DEFINE_BINARY_EXPR_COND2(mul_classical_op, fmpz_matxx,
         FMPZ_MATXX_COND_S, FMPZ_MATXX_COND_S,
         fmpz_mat_mul_classical(to._mat(), e1._mat(), e2._mat()))
+FLINT_DEFINE_BINARY_EXPR_COND2(mul_classical_op, fmpz_matxx,
+        FMPZ_MATXX_COND_S, FMPZ_MATXX_COND_S,
+        fmpz_mat_mul_strassen(to._mat(), e1._mat(), e2._mat()))
 FLINT_DEFINE_BINARY_EXPR_COND2(mul_multi_mod_op, fmpz_matxx,
         FMPZ_MATXX_COND_S, FMPZ_MATXX_COND_S,
         fmpz_mat_mul_multi_mod(to._mat(), e1._mat(), e2._mat()))
