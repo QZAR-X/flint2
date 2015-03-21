@@ -34,20 +34,21 @@
 
 int main(void)
 {
+
     fmpz_mat_t A, B, C, D;
     slong i;
     FLINT_TEST_INIT(state);
 
-    flint_printf("mul_strassen....");
+    flint_printf("mul_strassen....\n");
     fflush(stdout);
- 
+
     for (i = 0; i < 10 * flint_test_multiplier(); i++)
     {
         slong m, n, k;
 
-        n = 32 + n_randint(state, 50);
-        m = 32 + n_randint(state, 50);
-        k = 32 + n_randint(state, 50);
+        n = 1 + n_randint(state, 150);
+        m = 1 + n_randint(state, 150);
+        k = 1 + n_randint(state, 150);
 
         fmpz_mat_init(A, n, m);
         fmpz_mat_init(B, m, k);
@@ -56,12 +57,10 @@ int main(void)
 
         fmpz_mat_randtest(A, state, n_randint(state, 200) + 1);
         fmpz_mat_randtest(B, state, n_randint(state, 200) + 1);
-
-        /* Make sure noise in the output is ok */
         fmpz_mat_randtest(C, state, n_randint(state, 200) + 1);
 
         fmpz_mat_mul_strassen(C, A, B);
-        fmpz_mat_mul(D, A, B);
+        fmpz_mat_mul_classical(D, A, B);
 
         if (!fmpz_mat_equal(C, D))
         {

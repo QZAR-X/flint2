@@ -68,7 +68,7 @@ fmpz_mat_mul(fmpz_mat_t C, const fmpz_mat_t A, const fmpz_mat_t B)
 
         if (5*(ab + bb) > dim * dim || (bits > FLINT_BITS - 3 && dim < 60))
         {
-            fmpz_mat_mul_classical_inline(C, A, B);
+            fmpz_mat_mul_strassen(C, A, B);
         }
         else
         {

@@ -507,7 +507,7 @@ void fmpz_mat_mul(fmpz_mat_t C, const fmpz_mat_t A, const fmpz_mat_t B)
     compatible dimensions for matrix multiplication. Aliasing
     is allowed.
 
-    This function automatically switches between classical and
+    This function automatically switches between classical, strassen and
     multimodular multiplication, based on a heuristic comparison of
     the dimensions and entry sizes.
 
@@ -516,6 +516,16 @@ void fmpz_mat_mul_classical(fmpz_mat_t C,
 
     Sets \code{C} to the matrix product $C = A B$ computed using
     classical matrix algorithm.
+
+    The matrices must have compatible dimensions for matrix multiplication.
+    No aliasing is allowed.
+
+void fmpz_mat_mul_strassen(fmpz_mat_t C, 
+                           const fmpz_mat_t A, const fmpz_mat_t B)
+
+    Sets \code{C} to the matrix product $C = A B$ computed using
+    strassen matrix algorithm.
+    Automatically switches to classical algorithm for small matrices.
 
     The matrices must have compatible dimensions for matrix multiplication.
     No aliasing is allowed.

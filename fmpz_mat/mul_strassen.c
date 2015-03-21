@@ -23,106 +23,14 @@
 
 ******************************************************************************/
 
-/* void fmpz_mat_mul_strassen(fmpz_mat_t C, const fmpz_mat_t A, const fmpz_mat_t B); */
-
 #include "fmpz_mat.h"
-
-/* P = (A11 + A22) * (B11 + B22) */
-__inline__ static void
-mat_mul_strassen_p1(fmpz_mat_t P,
-                    const fmpz_mat_t A11, 
-                    const fmpz_mat_t A22, 
-                    const fmpz_mat_t B11, 
-                    const fmpz_mat_t B22)
-{
-    fmpz_mat_t F, S;
-    fmpz_mat_init(F, A11->r, A11->c);
-    fmpz_mat_init(S, B11->r, B11->c);
-
-    fmpz_mat_add(F, A11, A22);
-    fmpz_mat_add(S, B11, B22);
-    fmpz_mat_mul_strassen(P, F, S);
-
-    fmpz_mat_clear(F);
-    fmpz_mat_clear(S);
-}
-
-/* P = (A1 + A2) * B */
-__inline__ static void
-mat_mul_strassen_p2_p5(fmpz_mat_t P,
-                       const fmpz_mat_t A1,
-                       const fmpz_mat_t A2,
-                       const fmpz_mat_t B)
-{
-    fmpz_mat_t F;
-    fmpz_mat_init(F, A1->r, A1->c);
-
-    fmpz_mat_add(F, A1, A2);
-    fmpz_mat_mul_strassen(P, F, B);
-
-    fmpz_mat_clear(F);
-}
-
-/* P = A * (B1 - B2) */
-__inline__ static void
-mat_mul_strassen_p3_p4(fmpz_mat_t P,
-                       const fmpz_mat_t A,
-                       const fmpz_mat_t B1,
-                       const fmpz_mat_t B2)
-{
-    fmpz_mat_t S;
-    fmpz_mat_init(S, B1->r, B1->c);
-
-    fmpz_mat_sub(S, B1, B2);
-    fmpz_mat_mul_strassen(P, A, S);
-
-    fmpz_mat_clear(S);
-}
-
-/* P = (A1 - A2) * (B1 + B2) */
-__inline__ static void
-mat_mul_strassen_p6_p7(fmpz_mat_t P,
-                       const fmpz_mat_t A1,
-                       const fmpz_mat_t A2,
-                       const fmpz_mat_t B1,
-                       const fmpz_mat_t B2)
-{
-    fmpz_mat_t F, S;
-    fmpz_mat_init(F, A1->r, A1->c);
-    fmpz_mat_init(S, B1->r, B1->c);
-
-    fmpz_mat_sub(F, A1, A2);
-    fmpz_mat_add(S, B1, B2);
-    fmpz_mat_mul_strassen(P, F, S);
-
-    fmpz_mat_clear(F);
-    fmpz_mat_clear(S);
-}
-
-/* C = (P1 + P2) + (P3 - P4), where C have shared memory with P1 */
-__inline__ static void
-mat_mul_strassen_c11_c22(fmpz_mat_t P1,
-                         const fmpz_mat_t P2,
-                         const fmpz_mat_t P3,
-                         const fmpz_mat_t P4)
-{
-    fmpz_mat_t S;
-    fmpz_mat_init(S, P1->r, P1->c);
-
-    fmpz_mat_add(P1, P1, P2);
-    fmpz_mat_sub(S, P3, P4);
-    fmpz_mat_add(P1, P1, S);
-
-    fmpz_mat_clear(S);
-}
-
 
 __inline__ static void 
 mat_mul_fix_A_ncol_odd(fmpz_mat_t C, const fmpz_mat_t A, const fmpz_mat_t B)
 {
     slong n, m, k, i, j;
-    n = A->r & (~1);
-    m = B->c & (~1);
+    n = A->r & ~WORD(1);
+    m = B->c & ~WORD(1);
     k = A->c - 1;
 
     for (i = 0; i < n; i++) 
@@ -144,7 +52,7 @@ mat_mul_fix_A_nrow_odd(fmpz_mat_t C, const fmpz_mat_t A, const fmpz_mat_t B)
     fmpz_mat_window_init(nA, A, A->r - 1, 0, A->r, A->c);
     fmpz_mat_window_init(nC, C, A->r - 1, 0, A->r, C->c);
 
-    fmpz_mat_mul_classical(nC, nA, B);
+    fmpz_mat_mul_classical_inline(nC, nA, B);
 
     fmpz_mat_window_clear(nA);
     fmpz_mat_window_clear(nC);
@@ -154,13 +62,13 @@ __inline__ static void
 mat_mul_fix_B_ncol_odd(fmpz_mat_t C, const fmpz_mat_t A, const fmpz_mat_t B)
 {
     fmpz_mat_t nA, nB, nC;
-    slong ar = A->r & (~1);
+    slong ar = A->r & ~WORD(1);
 
     fmpz_mat_window_init(nA, A, 0, 0, ar, A->c);
     fmpz_mat_window_init(nB, B, 0, B->c - 1, B->r, B->c);
     fmpz_mat_window_init(nC, C, 0, B->c - 1, ar, C->c);
 
-    fmpz_mat_mul_classical(nC, nA, nB);
+    fmpz_mat_mul_classical_inline(nC, nA, nB);
 
     fmpz_mat_window_clear(nA);
     fmpz_mat_window_clear(nB);
@@ -171,19 +79,18 @@ void
 fmpz_mat_mul_strassen(fmpz_mat_t C, const fmpz_mat_t A, const fmpz_mat_t B)
 {
     fmpz_mat_t A11, A12, A21, A22, B11, B12, B21, B22, C11, C12, C21, C22;
-    fmpz_mat_t P1, P3, P4;
+    fmpz_mat_t Wnk, Wkm, Wnk_window;
 
     slong ar, ac, bc;
     slong ar_half, ac_half, br_half, bc_half, cr_half, cc_half;
-    slong pr, pc;
 
     ar = A->r;
     ac = A->c;
     bc = B->c;
 
-    if (ar * bc < 32 * 32)
+    if (ar * bc <= 32 *  32 || ar <= 4 || ac <= 4 || bc <= 4)
     {
-        fmpz_mat_mul_classical(C, A, B);
+        fmpz_mat_mul_classical_inline(C, A, B);
         return;
     } 
 
@@ -209,30 +116,41 @@ fmpz_mat_mul_strassen(fmpz_mat_t C, const fmpz_mat_t A, const fmpz_mat_t B)
     fmpz_mat_window_init(C21, C, cr_half, 0, 2 * cr_half, cc_half);
     fmpz_mat_window_init(C22, C, cr_half, cc_half, 2 * cr_half, 2 * cc_half);
 
-    pr = ar_half;
-    pc = bc_half;
+    fmpz_mat_init(Wnk, ar_half, FLINT_MAX(ac_half, bc_half));
+    fmpz_mat_zero(Wnk);
+    fmpz_mat_init(Wkm, br_half, bc_half);
+    fmpz_mat_window_init(Wnk_window, Wnk, 0, 0, ar_half, ac_half);
 
-    fmpz_mat_init(P1, pr, pc);
-    fmpz_mat_init(P3, pr, pc);
-    fmpz_mat_init(P4, pr, pc);
+    /* 
+        For more details see Table 1 from paper:
+        Brice Boyer, Jean-Guillaume Dumas, Clément Pernet, Wei Zhou,
+        "Memory efficient sheduling of Strassen-Winograd's matrix multipliation algorithm"
+        http://arxiv.org/pdf/0707.2347v5.pdf
+    */
+
+    fmpz_mat_sub(Wkm, B22, B12);
+    fmpz_mat_sub(Wnk_window, A11, A21);
+    fmpz_mat_mul_strassen(C21, Wnk_window, Wkm);
+    fmpz_mat_add(Wnk_window, A21, A22);
+    fmpz_mat_sub(Wkm, B12, B11);
+    fmpz_mat_mul_strassen(C22, Wnk_window, Wkm);
+    fmpz_mat_sub(Wkm, B22, Wkm);
+    fmpz_mat_sub(Wnk_window, Wnk_window, A11);
+    fmpz_mat_mul_strassen(C11, Wnk_window, Wkm);
+    fmpz_mat_sub(Wnk_window, A12, Wnk_window);
+    fmpz_mat_mul_strassen(C12, Wnk_window, B22);
+    fmpz_mat_add(C12, C22, C12);
+    fmpz_mat_mul_strassen(Wnk_window, A11, B11);
+    fmpz_mat_add(C11, C11, Wnk);
+    fmpz_mat_add(C12, C11, C12);
+    fmpz_mat_add(C11, C11, C21);
+    fmpz_mat_sub(Wkm, Wkm, B21);
+    fmpz_mat_mul_strassen(C21, A22, Wkm);
+    fmpz_mat_sub(C21, C11, C21);
+    fmpz_mat_add(C22, C11, C22);
+    fmpz_mat_mul_strassen(C11, A12, B21);
+    fmpz_mat_add(C11, C11, Wnk);
     
-    /* P5 = C12; P2 = C21; P6 = C22; P7 = C11; */
-    mat_mul_strassen_p1(P1, A11, A22, B11, B22);
-
-    mat_mul_strassen_p2_p5(C21, A21, A22, B11);
-    mat_mul_strassen_p2_p5(C12, A11, A12, B22);
-
-    mat_mul_strassen_p3_p4(P3, A11, B12, B22);
-    mat_mul_strassen_p3_p4(P4, A22, B21, B11);
-
-    mat_mul_strassen_p6_p7(C22, A21, A11, B11, B12);
-    mat_mul_strassen_p6_p7(C11, A12, A22, B21, B22);
-
-    mat_mul_strassen_c11_c22(C11, P1, P4, C12);
-    mat_mul_strassen_c11_c22(C22, P1, P3, C21);
-
-    fmpz_mat_add(C12, C12, P3);
-    fmpz_mat_add(C21, C21, P4);
 
     if (ar & 1) 
     {
@@ -262,7 +180,8 @@ fmpz_mat_mul_strassen(fmpz_mat_t C, const fmpz_mat_t A, const fmpz_mat_t B)
     fmpz_mat_window_clear(C21);
     fmpz_mat_window_clear(C22);
 
-    fmpz_mat_clear(P1);
-    fmpz_mat_clear(P3);
-    fmpz_mat_clear(P4);
+    fmpz_mat_window_clear(Wnk_window);
+
+    fmpz_mat_clear(Wnk);
+    fmpz_mat_clear(Wkm);
 }
